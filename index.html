@@ -44,7 +44,10 @@
   <div id="tab-file" class="card">
     <label for="fileInput">Selecciona el archivo de partida</label>
     <input type="file" id="fileInput" accept=".mgz,.mgx,.mgl,.aoe2record">
-    <button id="btnFile" onclick="parseFile()">Parsear</button>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button id="btnFile" onclick="parseFile()">Parsear</button>
+      <button id="btnDiagnose" onclick="diagnose()" style="background:#475569">Diagnosticar</button>
+    </div>
     <div id="error-file" class="error"></div>
   </div>
 
@@ -118,6 +121,26 @@ async function parseFile() {
     showError('error-file', e.message);
   } finally {
     setLoading('btnFile', false);
+  }
+}
+
+async function diagnose() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return showError('error-file', 'Selecciona un archivo primero');
+  document.getElementById('btnDiagnose').disabled = true;
+  document.getElementById('error-file').textContent = '';
+  document.getElementById('result').innerHTML = '';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(API + '/diagnose', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error');
+    showResult({_diagnostico: data});
+  } catch (e) {
+    showError('error-file', e.message);
+  } finally {
+    document.getElementById('btnDiagnose').disabled = false;
   }
 }
 

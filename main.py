@@ -31,7 +31,11 @@ def _summarize(data: bytes) -> dict:
         s = Summary(io.BytesIO(data))
     except Exception as e:
         logger.exception("Summary init failed")
-        raise HTTPException(status_code=422, detail=f"No se pudo leer la partida: {e}")
+        info = _diagnose(data)
+        detail = f"No se pudo leer la partida: {e}"
+        if info:
+            detail += f"\n\nInformación del archivo: save_version={info['save_version']}, game_version={info['game_version']}"
+        raise HTTPException(status_code=422, detail=detail)
 
     try:
         result = {
@@ -67,6 +71,23 @@ def _summarize_model(data: bytes) -> dict | None:
         return None
 
 
+def _diagnose(data: bytes) -> dict | None:
+    """Extrae info básica del header sin parse completo."""
+    from mgz.fast.header import decompress, parse_version
+    from mgz.util import Version
+    try:
+        header = decompress(io.BytesIO(data))
+        version, game, save, log = parse_version(header, data)
+        return {
+            "version_enum": str(version),
+            "game_version": game,
+            "save_version": save,
+            "log_version": log,
+        }
+    except Exception:
+        return None
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -90,6 +111,15 @@ async def parse_file(file: UploadFile = File(...)):
     if result is not None:
         return result
     return _summarize(data)
+
+
+@app.post("/diagnose", summary="Diagnose a file without fully parsing it")
+async def diagnose(file: UploadFile = File(...)):
+    data = await file.read()
+    info = _diagnose(data)
+    if not info:
+        raise HTTPException(status_code=422, detail="No se pudo leer el header del archivo")
+    return info
 
 
 @app.post("/parse-url", summary="Parse a recorded game from a URL")
