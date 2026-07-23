@@ -18,7 +18,7 @@
   button { background: #3b82f6; color: #fff; border: none; padding: .5rem 1.25rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
   button:hover { background: #2563eb; }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  .error { color: #f87171; margin-top: .5rem; }
+  .error { color: #f87171; margin-top: .5rem; display: none; background: #450a0a; border: 1px solid #991b1b; padding: .75rem; border-radius: 8px; }
   pre { background: #0f172a; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; margin-top: 1rem; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
   .badge { display: inline-block; background: #334155; padding: .15rem .6rem; border-radius: 999px; font-size: .75rem; color: #94a3b8; }
   nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
@@ -96,8 +96,9 @@ function showResult(data) {
 }
 
 function showError(id, msg) {
-  document.getElementById(id).textContent = msg;
-  setTimeout(() => document.getElementById(id).textContent = '', 6000);
+  const el = document.getElementById(id);
+  el.textContent = '❌ ' + msg;
+  el.style.display = 'block';
 }
 
 async function parseFile() {
