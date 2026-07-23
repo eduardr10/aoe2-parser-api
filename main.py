@@ -10,6 +10,35 @@ from fastapi.responses import FileResponse
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aoc-parser")
 
+# --- Parche mgz para save version >= 67.0 (DLC The Last Chieftains) ---
+# Basado en https://github.com/happyleavesaoc/aoc-mgz/pull/142
+# Parchea los fuentes ANTES de importar mgz
+import importlib.util as _iut
+_mgz_spec = _iut.find_spec("mgz")
+if _mgz_spec and _mgz_spec.origin:
+    _mgz_base = Path(_mgz_spec.origin).parent
+    _patches = [
+        (_mgz_base / "fast" / "header.py", [
+            ('if save >= 64.3:\n            data.read(4)\n\n        players.append(dict(',
+             'if save >= 64.3:\n            data.read(4)\n        if save >= 67.0:\n            de_string(data)\n\n        players.append(dict('),
+            ('if save >= 37:\n            timestamp, x = unpack(\'<II\', data)\n    rms_mod_id',
+             'if save >= 37:\n            timestamp, x = unpack(\'<II\', data)\n        if save >= 67.0:\n            data.read(8)\n    rms_mod_id'),
+        ]),
+        (_mgz_base / "header" / "de.py", [
+            (', "unknown_de_64_3" / Int32ul),\n)\n\nstring_block',
+             ', "unknown_de_64_3" / Int32ul),\n    If(lambda ctx: find_save_version(ctx) >= 67.0, "unknown_67_0" / de_string),\n)\n\nstring_block'),
+            ('Int32ul\n    ))\n)', 'Int32ul\n    )),\n    If(lambda ctx: find_save_version(ctx) >= 67.0, Bytes(8)),\n)'),
+        ]),
+    ]
+    for _fpath, _repls in _patches:
+        _content = _fpath.read_text(encoding="utf-8")
+        _new = _content
+        for _old, _new_text in _repls:
+            if _old in _new:
+                _new = _new.replace(_old, _new_text, 1)
+        if _new != _content:
+            _fpath.write_text(_new, encoding="utf-8")
+
 app = FastAPI(title="AoC Recorded Game Parser", version="1.0.0")
 
 app.add_middleware(
