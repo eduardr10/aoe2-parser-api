@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AoC Parser</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; }
+  .container { max-width: 900px; width: 100%; }
+  h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+  p.sub { color: #94a3b8; margin-bottom: 1.5rem; }
+  .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  label { display: block; font-weight: 600; margin-bottom: .5rem; }
+  input[type="file"] { display: block; width: 100%; padding: .5rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; margin-bottom: 1rem; }
+  .url-row { display: flex; gap: .5rem; }
+  .url-row input { flex: 1; padding: .5rem; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; }
+  button { background: #3b82f6; color: #fff; border: none; padding: .5rem 1.25rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  button:hover { background: #2563eb; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .error { color: #f87171; margin-top: .5rem; }
+  pre { background: #0f172a; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; margin-top: 1rem; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+  .badge { display: inline-block; background: #334155; padding: .15rem .6rem; border-radius: 999px; font-size: .75rem; color: #94a3b8; }
+  nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+  nav a { color: #94a3b8; text-decoration: none; padding: .5rem 0; border-bottom: 2px solid transparent; cursor: pointer; }
+  nav a.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+  .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #94a3b8; border-top-color: #3b82f6; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: .5rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  details { margin-top: 1rem; }
+  details summary { cursor: pointer; color: #94a3b8; font-size: .875rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>AoC Recorded Game Parser</h1>
+  <p class="sub">Sube un archivo <span class="badge">.mgz</span> <span class="badge">.mgx</span> <span class="badge">.mgl</span> <span class="badge">.aoe2record</span> o pega una URL</p>
+
+  <nav>
+    <a class="active" onclick="showTab('file')">Subir archivo</a>
+    <a onclick="showTab('url')">Desde URL</a>
+  </nav>
+
+  <!-- File tab -->
+  <div id="tab-file" class="card">
+    <label for="fileInput">Selecciona el archivo de partida</label>
+    <input type="file" id="fileInput" accept=".mgz,.mgx,.mgl,.aoe2record">
+    <button id="btnFile" onclick="parseFile()">Parsear</button>
+    <div id="error-file" class="error"></div>
+  </div>
+
+  <!-- URL tab -->
+  <div id="tab-url" class="card" style="display:none">
+    <label for="urlInput">URL pública del archivo</label>
+    <div class="url-row">
+      <input type="url" id="urlInput" placeholder="https://ejemplo.com/partida.mgz">
+      <button id="btnUrl" onclick="parseUrl()">Parsear</button>
+    </div>
+    <div id="error-url" class="error"></div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const API = 'https://aoe2-parser-api.onrender.com';
+
+function showTab(name) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-file').style.display = name === 'file' ? 'block' : 'none';
+  document.getElementById('tab-url').style.display = name === 'url' ? 'block' : 'none';
+  document.querySelector(`nav a[onclick*='${name}']`).classList.add('active');
+  document.getElementById('result').innerHTML = '';
+}
+
+function setLoading(id, loading) {
+  document.getElementById(id).disabled = loading;
+  document.getElementById(id).innerHTML = loading ? '<span class="spinner"></span>Parseando...' : 'Parsear';
+}
+
+function showResult(data) {
+  const el = document.getElementById('result');
+  const json = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const players = data?.players || data?.players ? data.players : [];
+  let summary = '';
+  if (players.length) {
+    const map = data.map?.name || '?';
+    const type = data.type || '?';
+    const speed = data.speed || '?';
+    const dur = data.duration || '?';
+    summary = `<div class="card" style="margin-bottom:.5rem">
+      <strong>${map}</strong> · ${type} · ${speed} · ${dur}<br>
+      <small>${players.map(p => p.name + ' (' + p.civilization + ')').join(', ')}</small>
+    </div>`;
+  }
+  el.innerHTML = summary + `<pre>${json}</pre>`;
+}
+
+function showError(id, msg) {
+  document.getElementById(id).textContent = msg;
+  setTimeout(() => document.getElementById(id).textContent = '', 6000);
+}
+
+async function parseFile() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return showError('error-file', 'Selecciona un archivo primero');
+  setLoading('btnFile', true);
+  document.getElementById('error-file').textContent = '';
+  document.getElementById('result').innerHTML = '';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(API + '/parse', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error del servidor');
+    showResult(data);
+  } catch (e) {
+    showError('error-file', e.message);
+  } finally {
+    setLoading('btnFile', false);
+  }
+}
+
+async function parseUrl() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return showError('error-url', 'Ingresa una URL');
+  setLoading('btnUrl', true);
+  document.getElementById('error-url').textContent = '';
+  document.getElementById('result').innerHTML = '';
+  try {
+    const fd = new FormData();
+    fd.append('url', url);
+    const res = await fetch(API + '/parse-url', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error del servidor');
+    showResult(data);
+  } catch (e) {
+    showError('error-url', e.message);
+  } finally {
+    setLoading('btnUrl', false);
+  }
+}
+</script>
+</body>
+</html>

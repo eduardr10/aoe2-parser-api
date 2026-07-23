@@ -1,10 +1,10 @@
 import io
-import tempfile
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from mgz.model import parse_match, serialize
 
 app = FastAPI(title="AoC Recorded Game Parser", version="1.0.0")
@@ -31,6 +31,11 @@ def _parse(data: bytes) -> dict:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def index():
+    return FileResponse(Path(__file__).parent / "index.html")
 
 
 @app.post("/parse", summary="Parse an uploaded recorded game file")
